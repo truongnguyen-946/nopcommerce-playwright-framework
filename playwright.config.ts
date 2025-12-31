@@ -71,11 +71,12 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
 webServer: {
-    // Trỏ đường dẫn tới file .csproj của bạn
-    command: 'dotnet run --project "D:/learn/Learn Auto/nopCommerce_4.90.3_Source/src/Presentation/Nop.Web/Nop.Web.csproj"',
-    url: 'http://localhost:59580',
-    reuseExistingServer: !process.env.CI, // Ở local sẽ dùng server đang bật, trên CI sẽ tự bật mới
-    timeout: 120 * 1000, // Đợi 2 phút để server .NET khởi động
-  },
+  command: 'dotnet run --project "../nopCommerce_4.90.3_Source/src/Presentation/Nop.Web/Nop.Web.csproj"',
+  url: 'http://localhost:59580',
+  reuseExistingServer: !process.env.CI,
+  timeout: 180 * 1000, // 3 phút
+  stdout: 'pipe',
+  stderr: 'pipe',
+},
   
 });
