@@ -32,15 +32,20 @@ jobs:
     # BƯỚC QUAN TRỌNG: Đưa cấu hình vào container để tránh lỗi Permission
     - name: Configure nopCommerce Settings
       run: |
-        # Đợi container khởi động một chút
-        sleep 5
+        sleep 10
         # Tìm ID của container nopcommerce
         CONTAINER_ID=$(docker ps -qf "ancestor=nopcommerceteam/nopcommerce:latest")
-        # Copy file cấu hình từ thư mục ci/ vào container
+        
+        # Tạo thư mục App_Data nếu chưa có (phòng xa)
+        docker exec -u root $CONTAINER_ID mkdir -p /app/App_Data
+        
+        # Copy file cấu hình vào
         docker cp ci/dataSettings.json $CONTAINER_ID:/app/App_Data/dataSettings.json
-        # Cấp quyền cho app đọc file
-        docker exec -u root $CONTAINER_ID chown -R www-data:www-data /app/App_Data/
-        echo "Configuration injected successfully!"
+        
+        # Cấp quyền đọc/ghi toàn diện cho thư mục App_Data
+        docker exec -u root $CONTAINER_ID chmod -R 777 /app/App_Data/
+        
+        echo "Configuration injected and permissions granted!"
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
