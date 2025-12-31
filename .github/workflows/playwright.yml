@@ -70,6 +70,14 @@ jobs:
         timeout 300 bash -c 'until curl -sSf http://localhost:59580 > /dev/null; do echo "Waiting..."; sleep 5; done'
         echo "nopCommerce is up and running!"
 
+    - name: Debug nopCommerce Page Content
+      run: |
+        echo "Checking what is actually on the page..."
+        # Lấy tiêu đề trang
+        curl -s http://localhost:59580 | grep -oP '(?<=<title>).*?(?=</title>)' || echo "No title found"
+        # Nếu muốn xem tại sao lỗi, in 50 dòng đầu của trang
+        curl -s http://localhost:59580 | head -n 50
+
     - name: Run Playwright tests
       run: pnpm exec playwright test
       env:
