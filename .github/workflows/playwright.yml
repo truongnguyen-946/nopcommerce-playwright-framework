@@ -25,6 +25,12 @@ jobs:
           - 59580:80
         env:
           ASPNETCORE_ENVIRONMENT: Development
+          # ÉP APP BỎ QUA MÀN HÌNH INSTALL BẰNG BIẾN MÔI TRƯỜNG
+          # (Lưu ý: Các biến này bắt đầu bằng NOP_...)
+          NOP_DB_CONNECTION_STRING: "Data Source=sqlserver;Initial Catalog=nopCommerce;User ID=sa;Password=Can@922946;TrustServerCertificate=True"
+          NOP_DB_PROVIDER: "sqlserver"
+          # Tự động cài đặt dữ liệu mẫu (Sample data) để có nút Register mà test
+          NOP_INSTALL_SAMPLE_DATA: "True"
 
     steps:
     - uses: actions/checkout@v4
