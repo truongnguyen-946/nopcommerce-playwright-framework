@@ -22,6 +22,18 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Create nopCommerce Database
+      run: |
+        echo "Waiting for SQL Server to be ready..."
+        sleep 20
+        
+        echo "Creating database..."
+        docker exec $(docker ps -qf "ancestor=mcr.microsoft.com/mssql/server:2022-latest") \
+          /opt/mssql-tools18/bin/sqlcmd \
+          -S localhost -U sa -P "Can@922946" \
+          -Q "CREATE DATABASE [nopCommerce];" \
+          -C
+
     - name: Start nopCommerce Container
       run: |
         sleep 20
