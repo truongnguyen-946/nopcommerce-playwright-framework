@@ -1,9 +1,9 @@
 name: Playwright Tests
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, fix-ci]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, fix-ci]
 
 jobs:
   test:
@@ -22,70 +22,167 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    # BƯỚC 1: Tạo file cấu hình để Skip Install
-    - name: Create nopCommerce Configuration
+    - name: Create nopCommerce Database
       run: |
-        mkdir -p App_Data
-        echo '{
-          "DataConfig": {
-            "DataProvider": "sqlserver",
-            "ConnectionString": "Server=localhost,1433;Database=nopCommerce;User ID=sa;Password=Can@922946;TrustServerCertificate=True;Encrypt=False",
-            "Dbms": "sqlserver"
-          }
-        }' > App_Data/dataSettings.json
-
-    # BƯỚC 2: Tạo Database và ép App không phải chạy Migration nặng
-    - name: Prepare Database
-      run: |
-        # Chờ SQL Server thực sự sống
+        echo "Waiting for SQL Server to be ready..."
         sleep 20
-        # Tạo DB rỗng
-        docker exec $(docker ps -qf "ancestor=mcr.microsoft.com/mssql/server:2022-latest") /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Can@922946" -Q "CREATE DATABASE [nopCommerce];" -C
+        
+        echo "Creating database..."
+        docker exec $(docker ps -qf "ancestor=mcr.microsoft.com/mssql/server:2022-latest") \
+          /opt/mssql-tools18/bin/sqlcmd \
+          -S localhost -U sa -P "Can@922946" \
+          -Q "CREATE DATABASE [nopCommerce];" \
+          -C
 
-    # BƯỚC 3: Chạy App với RAM tối ưu
-    - name: Run nopCommerce
+    - name: Start nopCommerce Container
       run: |
+        sleep 20
+        
         docker run -d \
           --name nop_app \
           --network host \
-          -v $(pwd)/App_Data/dataSettings.json:/app/App_Data/dataSettings.json \
-          -e ASPNETCORE_ENVIRONMENT=Production \
-          -e DOTNET_PRINT_TELEMETRY_MESSAGE=false \
+          --restart unless-stopped \
           nopcommerceteam/nopcommerce:latest
         
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
+        echo "Waiting for nopCommerce to start..."
+        sleep 30
 
-    - name: Install pnpm & Playwright
+    - name: Setup Node & Playwright
       run: |
         npm install -g pnpm
         pnpm install
         pnpm exec playwright install --with-deps chromium
 
-    # BƯỚC 4: Kiểm tra thông minh hơn
-    - name: Wait for App (Max 5 mins)
+    - name: Automate Installation with Playwright
       run: |
-        echo "Check log initial..."
-        sleep 30
-        docker logs nop_app --tail 50
+        cat > install.mjs << 'EOF'
+        import { chromium } from '@playwright/test';
+
+        (async () => {
+          const browser = await chromium.launch();
+          const page = await browser.newPage();
+          
+          try {
+            console.log('Opening installation page...');
+            await page.goto('http://localhost:80/install', { waitUntil: 'domcontentloaded', timeout: 60000 });
+            
+            await page.waitForSelector('select#DataProvider', { state: 'visible', timeout: 10000 });
+            
+            console.log('Filling database information...');
+            await page.selectOption('select#DataProvider', '1');
+            await page.waitForTimeout(2000);
+            
+            console.log('Filling connection details...');
+            await page.fill('input#ServerName', 'localhost');
+            await page.fill('input#DatabaseName', 'nopCommerce');
+            
+            const integratedAuth = page.locator('input#IntegratedSecurity');
+            if (await integratedAuth.isChecked()) {
+              await integratedAuth.uncheck();
+              await page.waitForTimeout(500);
+            }
+            
+            await page.fill('input#Username', 'sa');
+            await page.fill('input#Password', 'Can@922946');
+            
+            const trustCert = page.locator('input#TrustServerCertificate');
+            if (await trustCert.count() > 0) {
+              await trustCert.check();
+            }
+            
+            console.log('Filling admin information...');
+            await page.fill('input#AdminEmail', 'admin@yourstore.com');
+            await page.fill('input#AdminPassword', 'admin123');
+            await page.fill('input#ConfirmPassword', 'admin123');
+            
+            console.log('Enabling sample data...');
+            const sampleDataCheckbox = page.locator('input#InstallSampleData');
+            if (await sampleDataCheckbox.count() > 0) {
+              await sampleDataCheckbox.check();
+            }
+            
+            console.log('Submitting installation form...');
+            const submitButton = page.locator('button[type="submit"].btn-install');
+            await submitButton.click();
+            
+            // Wait a moment to ensure form submission started
+            await page.waitForTimeout(5000);
+            
+            // Check for immediate validation errors
+            if (page.url().includes('/install')) {
+              const errorMessages = await page.$$eval('.field-validation-error, .validation-summary-errors li', 
+                errors => errors.map(e => e.textContent.trim()).filter(t => t.length > 0)
+              );
+              if (errorMessages.length > 0) {
+                console.error('❌ Validation errors found:', errorMessages);
+                await browser.close();
+                process.exit(1);
+              }
+            }
+            
+            console.log('✅ Form submitted successfully! Installation is processing...');
+            await browser.close();
+            process.exit(0);
+          } catch (error) {
+            console.error('❌ Form submission failed:', error.message);
+            await page.screenshot({ path: 'installation-error.png', fullPage: true });
+            await browser.close();
+            process.exit(1);
+          }
+        })();
+        EOF
         
-        # Thử kết nối, nếu lỗi thì in log ra ngay để biết tại sao
-        for i in {1..30}; do
-          if curl -s http://localhost:80 | grep -q "nopCommerce"; then
-            echo "Success: nopCommerce is UP!"
-            exit 0
+        node install.mjs
+
+    - name: Wait for Installation to Complete
+      run: |
+        echo "⏳ Waiting for nopCommerce installation (can take 3-5 minutes for schema + sample data)..."
+        echo "The app will restart automatically after installation completes."
+        
+        # Give it time to start the heavy database work
+        sleep 30
+        
+        RESTART_DETECTED=false
+        
+        for i in {1..60}; do
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:80 2>/dev/null || echo "000")
+          
+          # Status 200 with home page = SUCCESS
+          if [ "$STATUS" == "200" ]; then
+            if curl -s http://localhost:80 2>/dev/null | grep -q "ico-register"; then
+              echo "✅ Installation complete! nopCommerce is ready."
+              exit 0
+            fi
           fi
-          echo "Attempt $i: App is still loading tables... (Wait 10s)"
-          docker logs nop_app --tail 3
+          
+          # Status 000 means app is down (likely restarting after install)
+          if [ "$STATUS" == "000" ]; then
+            if [ "$RESTART_DETECTED" == "false" ]; then
+              echo "🔄 App restart detected (normal after installation)..."
+              RESTART_DETECTED=true
+            fi
+            echo "[$i/60] Waiting for app to come back online..."
+          else
+            echo "[$i/60] Status: $STATUS (waiting for installation...)"
+          fi
+          
           sleep 10
         done
-        echo "Timeout! Showing logs for debugging:"
-        docker logs nop_app
+        
+        echo "❌ Installation timeout after 10+ minutes"
+        docker logs nop_app --tail 50
         exit 1
 
     - name: Run Playwright tests
       run: pnpm exec playwright test
       env:
         BASE_URL: http://localhost:80
+
+# THÊM ĐOẠN NÀY VÀO CUỐI FILE
+    - name: Upload Playwright report
+      if: always() # Luôn chạy kể cả khi test fail
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: test-results/ # Hoặc playwright-report/ tùy cấu hình của bạn
+        retention-days: 7
