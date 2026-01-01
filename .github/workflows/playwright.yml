@@ -91,3 +91,12 @@ jobs:
       run: pnpm exec playwright test
       env:
         BASE_URL: http://localhost:80
+
+# THÊM ĐOẠN NÀY VÀO CUỐI FILE
+    - name: Upload Playwright report
+      if: always() # Luôn chạy kể cả khi test fail
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: test-results/ # Hoặc playwright-report/ tùy cấu hình của bạn
+        retention-days: 7
