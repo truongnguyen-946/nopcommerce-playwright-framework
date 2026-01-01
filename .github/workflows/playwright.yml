@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      # 1. Database
       sqlserver:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
@@ -20,20 +19,36 @@ jobs:
         ports:
           - 1433:1433
 
-      # 2. Web App
-      nopcommerce:
-        image: nopcommerceteam/nopcommerce:latest
-        ports:
-          - 59580:80
-        env:
-          ASPNETCORE_ENVIRONMENT: Development
-          # Thêm cổng 1433 và TrustServerCertificate=True
-          NOP_DB_CONNECTION_STRING: "Server=sqlserver,1433;Database=nopCommerce;User ID=sa;Password=Can@922946;TrustServerCertificate=True;Encrypt=False"
-          NOP_DB_PROVIDER: "sqlserver"
-          NOP_INSTALL_SAMPLE_DATA: "True"
-
     steps:
     - uses: actions/checkout@v4
+
+    # BƯỚC QUAN TRỌNG: Tạo file cấu hình để Skip bước Install
+    - name: Create nopCommerce Configuration
+      run: |
+        mkdir -p App_Data
+        echo '{
+          "DataConfig": {
+            "DataProvider": "sqlserver",
+            "ConnectionString": "Server=localhost,1433;Database=nopCommerce;User ID=sa;Password=Can@922946;TrustServerCertificate=True;Encrypt=False",
+            "Dbms": "sqlserver"
+          }
+        }' > App_Data/dataSettings.json
+
+    # BƯỚC QUAN TRỌNG: Tạo Database trống trước (Vì chúng ta đã skip install)
+    - name: Pre-create Database
+      run: |
+        sudo apt-get update && sudo apt-get install -y mssql-tools18 unixodbc-dev
+        /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Can@922946" -Q "CREATE DATABASE [nopCommerce];" -C
+
+    # BƯỚC MỚI: Chạy nopCommerce bằng Docker Run thay vì Service để Mount được file cấu hình
+    - name: Run nopCommerce Container
+      run: |
+        docker run -d \
+          --name nopcommerce_app \
+          --network host \
+          -v $(pwd)/App_Data/dataSettings.json:/app/App_Data/dataSettings.json \
+          -e ASPNETCORE_ENVIRONMENT=Development \
+          nopcommerceteam/nopcommerce:latest
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -53,18 +68,15 @@ jobs:
 
     - name: Wait for nopCommerce to be ready
       run: |
-        echo "Waiting for nopCommerce to fully render (including DB setup)..."
-        # Đợi cho đến khi trang web trả về nội dung có chữ "nopCommerce"
-        timeout 450 bash -c 'until curl -s http://localhost:59580 | grep -q "nopCommerce"; do echo "Still initializing database... please wait"; sleep 15; done'
-        echo "nopCommerce is fully ready with content!"
-
-    - name: Debug Final Page
-      run: curl -s http://localhost:59580 | head -n 20
+        echo "Waiting for nopCommerce to start..."
+        # Đợi App phản hồi (nopCommerce khởi động lần đầu vẫn mất khoảng 30-60s)
+        timeout 300 bash -c 'until curl -s http://localhost:80 | grep -q "nopCommerce"; do echo "App is starting up..."; sleep 10; done'
+        echo "nopCommerce is ready!"
 
     - name: Run Playwright tests
       run: pnpm exec playwright test
       env:
-        BASE_URL: http://localhost:59580
+        BASE_URL: http://localhost:80
 
     - name: Upload Playwright report
       if: always()
