@@ -41,6 +41,7 @@ jobs:
         docker run -d \
           --name nop_app \
           --network host \
+          --restart unless-stopped \
           nopcommerceteam/nopcommerce:latest
         
         echo "Waiting for nopCommerce to start..."
