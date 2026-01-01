@@ -36,16 +36,47 @@ jobs:
 
     - name: Start nopCommerce Container
       run: |
-        sleep 20
+        echo "Getting SQL Server container info..."
+        SQL_CONTAINER=$(docker ps -qf "ancestor=mcr.microsoft.com/mssql/server:2022-latest")
+        SQL_NETWORK=$(docker inspect $SQL_CONTAINER -f '{{range $net, $conf := .NetworkSettings.Networks}}{{$net}}{{end}}')
+        SQL_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $SQL_CONTAINER)
+        
+        echo "SQL Server Network: $SQL_NETWORK"
+        echo "SQL Server IP: $SQL_IP"
+        echo "SQL_SERVER_IP=$SQL_IP" >> $GITHUB_ENV
+
+        echo "Waiting for SQL Server to be fully ready..."
+        sleep 30
         
         docker run -d \
           --name nop_app \
-          --network host \
+          --network $SQL_NETWORK \
+          -p 5000:80 \
           --restart unless-stopped \
           nopcommerceteam/nopcommerce:latest
         
         echo "Waiting for nopCommerce to start..."
         sleep 30
+
+        echo "Checking container status..."
+        docker ps -a
+        docker logs nop_app
+
+    - name: Wait for nopCommerce to be Ready
+      run: |
+        echo "Waiting for nopCommerce to be accessible..."
+        for i in {1..30}; do
+          if curl -f http://localhost:5000 2>/dev/null; then
+            echo "✅ nopCommerce is ready!"
+            exit 0
+          fi
+          echo "[$i/30] Waiting for nopCommerce to start..."
+          sleep 5
+        done
+        
+        echo "❌ nopCommerce failed to start"
+        docker logs nop_app
+        exit 1
 
     - name: Setup Node & Playwright
       run: |
@@ -55,6 +86,13 @@ jobs:
 
     - name: Automate Installation with Playwright
       run: |
+
+        # Lấy SQL Server IP
+        SQL_CONTAINER=$(docker ps -qf "ancestor=mcr.microsoft.com/mssql/server:2022-latest")
+        SQL_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $SQL_CONTAINER)
+        
+        echo "Using SQL Server IP: $SQL_IP"
+
         cat > install.mjs << 'EOF'
         import { chromium } from '@playwright/test';
 
@@ -64,7 +102,7 @@ jobs:
           
           try {
             console.log('Opening installation page...');
-            await page.goto('http://localhost:80/install', { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.goto('http://localhost:5000/install', { waitUntil: 'domcontentloaded', timeout: 90000 });
             
             await page.waitForSelector('select#DataProvider', { state: 'visible', timeout: 10000 });
             
@@ -73,7 +111,7 @@ jobs:
             await page.waitForTimeout(2000);
             
             console.log('Filling connection details...');
-            await page.fill('input#ServerName', 'localhost');
+            await page.fill('input#ServerName', process.env.SQL_IP);
             await page.fill('input#DatabaseName', 'nopCommerce');
             
             const integratedAuth = page.locator('input#IntegratedSecurity');
@@ -132,7 +170,7 @@ jobs:
         })();
         EOF
         
-        node install.mjs
+        SQL_IP=$SQL_IP node install.mjs
 
     - name: Wait for Installation to Complete
       run: |
@@ -145,11 +183,11 @@ jobs:
         RESTART_DETECTED=false
         
         for i in {1..60}; do
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:80 2>/dev/null || echo "000")
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:5000 2>/dev/null || echo "000")
           
           # Status 200 with home page = SUCCESS
           if [ "$STATUS" == "200" ]; then
-            if curl -s http://localhost:80 2>/dev/null | grep -q "ico-register"; then
+            if curl -s http://localhost:5000 2>/dev/null | grep -q "ico-register"; then
               echo "✅ Installation complete! nopCommerce is ready."
               exit 0
             fi
@@ -176,13 +214,12 @@ jobs:
     - name: Run Playwright tests
       run: pnpm exec playwright test
       env:
-        BASE_URL: http://localhost:80
+        BASE_URL: http://localhost:5000
 
-# THÊM ĐOẠN NÀY VÀO CUỐI FILE
-    - name: Upload Playwright report
-      if: always() # Luôn chạy kể cả khi test fail
+    - name: Upload Allure report
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: playwright-report
-        path: test-results/ # Hoặc playwright-report/ tùy cấu hình của bạn
+        name: allure-report
+        path: allure-results/
         retention-days: 7
