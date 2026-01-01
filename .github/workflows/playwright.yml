@@ -57,15 +57,40 @@ jobs:
             await page.waitForSelector('select#DataProvider', { state: 'visible', timeout: 10000 });
             
             console.log('Filling database information...');
-            // Select SQL Server - check actual option value
-            await page.selectOption('select#DataProvider', { label: 'SQL Server' });
+            
+            // Debug: Get all available options
+            const options = await page.$$eval('select#DataProvider option', opts => 
+              opts.map(opt => ({ value: opt.value, text: opt.textContent }))
+            );
+            console.log('Available database options:', JSON.stringify(options, null, 2));
+            
+            // Select SQL Server by value (try common variations)
+            const sqlServerOption = options.find(opt => 
+              opt.value.toLowerCase().includes('sql') || 
+              opt.text.toLowerCase().includes('sql server')
+            );
+            
+            if (sqlServerOption) {
+              console.log(`Selecting option: ${sqlServerOption.value}`);
+              await page.selectOption('select#DataProvider', sqlServerOption.value);
+            } else {
+              throw new Error('SQL Server option not found in dropdown');
+            }
             
             // Wait for connection string fields to appear
-            await page.waitForTimeout(1000);
+            await page.waitForTimeout(2000);
             
+            console.log('Filling connection details...');
             await page.fill('input#ServerName', 'localhost');
             await page.fill('input#DatabaseName', 'nopCommerce');
-            await page.uncheck('input#IntegratedSecurity'); // Uncheck Windows Authentication
+            
+            // Uncheck Windows Authentication
+            const integratedAuth = page.locator('input#IntegratedSecurity');
+            if (await integratedAuth.isChecked()) {
+              await integratedAuth.uncheck();
+              await page.waitForTimeout(500);
+            }
+            
             await page.fill('input#Username', 'sa');
             await page.fill('input#Password', 'Can@922946');
             
@@ -98,7 +123,8 @@ jobs:
             process.exit(0);
           } catch (error) {
             console.error('❌ Installation failed:', error.message);
-            await page.screenshot({ path: 'installation-error.png' });
+            await page.screenshot({ path: 'installation-error.png', fullPage: true });
+            console.log('Page URL:', page.url());
             await browser.close();
             process.exit(1);
           }
