@@ -22,37 +22,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install nopCommerce via Installation Wizard (API)
+    - name: Start nopCommerce Container
       run: |
         sleep 20
         
-        # Chạy container tạm để vào trang Install
         docker run -d \
           --name nop_app \
           --network host \
           nopcommerceteam/nopcommerce:latest
         
-        echo "Waiting for app to start..."
+        echo "Waiting for nopCommerce to start..."
         sleep 30
-        
-        # Gọi API Install tự động
-        curl -X POST http://localhost:80/install \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          -d "DbProvider=sqlserver" \
-          -d "DataProvider=sqlserver" \
-          -d "ServerName=localhost" \
-          -d "DatabaseName=nopCommerce" \
-          -d "IntegratedSecurity=false" \
-          -d "Username=sa" \
-          -d "Password=Can@922946" \
-          -d "TrustServerCertificate=true" \
-          -d "CreateSampleData=true" \
-          -d "AdminEmail=admin@yourstore.com" \
-          -d "AdminPassword=admin123" \
-          -d "ConfirmPassword=admin123" \
-          -d "InstallSampleData=true"
-        
-        echo "Installation triggered. Waiting for completion..."
 
     - name: Setup Node & Playwright
       run: |
@@ -60,29 +40,57 @@ jobs:
         pnpm install
         pnpm exec playwright install --with-deps chromium
 
-    - name: Wait for Installation Complete
+    - name: Automate Installation with Playwright
       run: |
-        echo "Waiting for nopCommerce installation (2-4 minutes)..."
-        
-        for i in {1..40}; do
-          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:80)
+        cat > install.mjs << 'EOF'
+        import { chromium } from '@playwright/test';
+
+        (async () => {
+          const browser = await chromium.launch();
+          const page = await browser.newPage();
           
-          # Status 200 = installation complete
-          if [ "$STATUS" == "200" ]; then
-            if curl -s http://localhost:80 | grep -q "ico-register"; then
-              echo "✅ SUCCESS: nopCommerce is ready!"
-              exit 0
-            fi
-          fi
+          console.log('Opening installation page...');
+          await page.goto('http://localhost:80/install', { waitUntil: 'networkidle' });
           
-          # Status 302 = still on install wizard (normal during installation)
-          echo "[$i/40] Status: $STATUS (waiting...)"
-          sleep 15
-        done
+          console.log('Filling database information...');
+          await page.selectOption('select#DataProvider', 'sqlserver');
+          await page.fill('input#ServerName', 'localhost');
+          await page.fill('input#DatabaseName', 'nopCommerce');
+          await page.fill('input#Username', 'sa');
+          await page.fill('input#Password', 'Can@922946');
+          await page.check('input#TrustServerCertificate');
+          
+          console.log('Filling admin information...');
+          await page.fill('input#AdminEmail', 'admin@yourstore.com');
+          await page.fill('input#AdminPassword', 'admin123');
+          await page.fill('input#ConfirmPassword', 'admin123');
+          
+          console.log('Enabling sample data...');
+          await page.check('input#InstallSampleData');
+          
+          console.log('Submitting installation form...');
+          await page.click('button[type="submit"]');
+          
+          console.log('Waiting for installation to complete (this may take 3-5 minutes)...');
+          await page.waitForURL('http://localhost:80/', { timeout: 360000 });
+          
+          console.log('✅ Installation completed successfully!');
+          await browser.close();
+        })();
+        EOF
         
-        echo "❌ Installation timeout. Logs:"
-        docker logs nop_app --tail 50
-        exit 1
+        node install.mjs
+
+    - name: Verify Installation Success
+      run: |
+        STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:80)
+        if [ "$STATUS" == "200" ]; then
+          echo "✅ nopCommerce is ready for testing!"
+        else
+          echo "❌ Unexpected status: $STATUS"
+          docker logs nop_app --tail 30
+          exit 1
+        fi
 
     - name: Run Playwright tests
       run: pnpm exec playwright test
