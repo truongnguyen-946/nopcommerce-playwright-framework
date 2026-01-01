@@ -24,11 +24,17 @@ export default defineConfig({
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'allure-playwright',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+  timeout: 90000, 
+  expect: {
+    timeout: 15000, // Đợi locator tối đa 15s
+  },
   use: {
-    /* Base URL to use in actions like `await page.goto('')`. */
-     baseURL: 'http://localhost:80',
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+    // Đảm bảo dùng cổng 80
+    baseURL: process.env.BASE_URL || 'http://localhost:80',
+    actionTimeout: 20000,
+    navigationTimeout: 40000,
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
   },
 
   /* Configure projects for major browsers */

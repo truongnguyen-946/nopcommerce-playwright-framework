@@ -62,6 +62,16 @@ jobs:
             echo "SUCCESS: App is rendered and ready for testing!"
             exit 0
           fi
+
+          # Kiểm tra xem có class ico-register (nút đăng ký) trong HTML không
+          if echo "$RESPONSE" | grep -q "ico-register"; then
+            echo "SUCCESS: Register button found! App is fully ready."
+            exit 0
+          fi
+          
+          echo "Attempt $i: App is up but UI components (ico-register) are not rendered yet. Waiting 15s..."
+          sleep 15
+
           
           STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:80)
           echo "Attempt $i: Status $STATUS. App is still building database..."
@@ -74,7 +84,7 @@ jobs:
           sleep 15
         done
         echo "FAILED: Final Container Logs:"
-        docker logs nop_app
+        docker logs nop_app --tail 100
         exit 1
 
     - name: Run Playwright tests
