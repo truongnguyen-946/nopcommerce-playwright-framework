@@ -49,33 +49,59 @@ jobs:
           const browser = await chromium.launch();
           const page = await browser.newPage();
           
-          console.log('Opening installation page...');
-          await page.goto('http://localhost:80/install', { waitUntil: 'networkidle' });
-          
-          console.log('Filling database information...');
-          await page.selectOption('select#DataProvider', 'sqlserver');
-          await page.fill('input#ServerName', 'localhost');
-          await page.fill('input#DatabaseName', 'nopCommerce');
-          await page.fill('input#Username', 'sa');
-          await page.fill('input#Password', 'Can@922946');
-          await page.check('input#TrustServerCertificate');
-          
-          console.log('Filling admin information...');
-          await page.fill('input#AdminEmail', 'admin@yourstore.com');
-          await page.fill('input#AdminPassword', 'admin123');
-          await page.fill('input#ConfirmPassword', 'admin123');
-          
-          console.log('Enabling sample data...');
-          await page.check('input#InstallSampleData');
-          
-          console.log('Submitting installation form...');
-          await page.click('button[type="submit"]');
-          
-          console.log('Waiting for installation to complete (this may take 3-5 minutes)...');
-          await page.waitForURL('http://localhost:80/', { timeout: 360000 });
-          
-          console.log('✅ Installation completed successfully!');
-          await browser.close();
+          try {
+            console.log('Opening installation page...');
+            await page.goto('http://localhost:80/install', { waitUntil: 'domcontentloaded', timeout: 60000 });
+            
+            // Wait for form to be ready
+            await page.waitForSelector('select#DataProvider', { state: 'visible', timeout: 10000 });
+            
+            console.log('Filling database information...');
+            // Select SQL Server - check actual option value
+            await page.selectOption('select#DataProvider', { label: 'SQL Server' });
+            
+            // Wait for connection string fields to appear
+            await page.waitForTimeout(1000);
+            
+            await page.fill('input#ServerName', 'localhost');
+            await page.fill('input#DatabaseName', 'nopCommerce');
+            await page.uncheck('input#IntegratedSecurity'); // Uncheck Windows Authentication
+            await page.fill('input#Username', 'sa');
+            await page.fill('input#Password', 'Can@922946');
+            
+            // Check Trust Server Certificate if it exists
+            const trustCert = page.locator('input#TrustServerCertificate');
+            if (await trustCert.count() > 0) {
+              await trustCert.check();
+            }
+            
+            console.log('Filling admin information...');
+            await page.fill('input#AdminEmail', 'admin@yourstore.com');
+            await page.fill('input#AdminPassword', 'admin123');
+            await page.fill('input#ConfirmPassword', 'admin123');
+            
+            console.log('Enabling sample data...');
+            const sampleDataCheckbox = page.locator('input#InstallSampleData');
+            if (await sampleDataCheckbox.count() > 0) {
+              await sampleDataCheckbox.check();
+            }
+            
+            console.log('Submitting installation form...');
+            await page.click('button[type="submit"]');
+            
+            console.log('Waiting for installation to complete (this may take 3-5 minutes)...');
+            // Wait for redirect to home page (installation complete)
+            await page.waitForURL('http://localhost:80/', { timeout: 360000 });
+            
+            console.log('✅ Installation completed successfully!');
+            await browser.close();
+            process.exit(0);
+          } catch (error) {
+            console.error('❌ Installation failed:', error.message);
+            await page.screenshot({ path: 'installation-error.png' });
+            await browser.close();
+            process.exit(1);
+          }
         })();
         EOF
         
