@@ -32,6 +32,8 @@ export class MenuHeader {
      * Waits for the link to be visible before clicking.
      */
     async openRegisterPage(): Promise<void> {
+        await this.page.waitForLoadState('networkidle');
+
         await this.registerLink.waitFor({ state: "visible" });
         await this.registerLink.click();
     }
