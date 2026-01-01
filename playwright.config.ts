@@ -31,7 +31,7 @@ export default defineConfig({
   workers: 1, 
   use: {
     // Đảm bảo dùng cổng 80
-    baseURL: process.env.BASE_URL || 'http://localhost:80',
+    baseURL: process.env.BASE_URL || 'http://localhost:5000',
     contextOptions: {
       ignoreHTTPSErrors: true,
     },

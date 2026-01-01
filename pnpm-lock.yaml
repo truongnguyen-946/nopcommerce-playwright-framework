@@ -14,6 +14,9 @@ importers:
       '@types/node':
         specifier: ^24.10.4
         version: 24.10.4
+      allure-js-commons:
+        specifier: ^3.4.3
+        version: 3.4.3(allure-playwright@3.4.3(@playwright/test@1.57.0))
       allure-playwright:
         specifier: ^3.4.3
         version: 3.4.3(@playwright/test@1.57.0)
