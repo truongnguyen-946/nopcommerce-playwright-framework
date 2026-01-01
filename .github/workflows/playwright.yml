@@ -27,31 +27,19 @@ jobs:
         sleep 20
         docker exec $(docker ps -qf "ancestor=mcr.microsoft.com/mssql/server:2022-latest") /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Can@922946" -Q "CREATE DATABASE [nopCommerce];" -C
 
-    - name: Run nopCommerce with Injected Config
+    - name: Run nopCommerce (Full Auto-Install)
       run: |
-        # 1. Tạo thư mục chứa config trên runner
-        mkdir -p $(pwd)/nop_data
-        
-        # 2. Tạo file dataSettings.json chuẩn
-        # Lưu ý: Dùng 'host.docker.internal' hoặc '127.0.0.1' tùy theo network mode
-        cat <<EOF > $(pwd)/nop_data/dataSettings.json
-        {
-          "DbConnectionString": "Server=127.0.0.1,1433;Database=nopCommerce;User ID=sa;Password=Can@922946;TrustServerCertificate=True;Encrypt=False",
-          "DataProvider": "sqlserver",
-          "SQLCommandTimeout": null
-        }
-        EOF
-        
-        # 3. Cấp quyền đọc/ghi tuyệt đối cho thư mục này
-        chmod -R 777 $(pwd)/nop_data
-
-        # 4. Chạy Docker và MOUNT file vào đúng vị trí App_Data
-        # Sử dụng --network host để App nhìn thấy SQL Server ở localhost
+        # Chạy App với đầy đủ các biến môi trường để nó tự thực hiện cài đặt ngầm (Silent Install)
+        # Chúng ta bỏ qua bước tạo file JSON thủ công để tránh lỗi quyền hạn (Permission)
         docker run -d \
           --name nop_app \
           --network host \
-          -v $(pwd)/nop_data/dataSettings.json:/app/App_Data/dataSettings.json \
           -e ASPNETCORE_ENVIRONMENT=Production \
+          -e NOP_DB_CONNECTION_STRING="Server=127.0.0.1,1433;Database=nopCommerce;User ID=sa;Password=Can@922946;TrustServerCertificate=True;Encrypt=False" \
+          -e NOP_DB_PROVIDER="sqlserver" \
+          -e NOP_INSTALL_SAMPLE_DATA="True" \
+          -e NOP_ADMIN_EMAIL="admin@yourstore.com" \
+          -e NOP_ADMIN_PASSWORD="admin_password" \
           nopcommerceteam/nopcommerce:latest
 
     - name: Setup Node & Playwright
@@ -62,29 +50,31 @@ jobs:
 
     - name: Wait for App ready
       run: |
-        echo "Waiting for nopCommerce to bypass Install page..."
-        # Đợi 60s để App thực hiện Migration (tạo bảng) ngầm
-        sleep 60
+        echo "Waiting for nopCommerce to auto-install (this can take 2-3 minutes)..."
+        # Tăng thời gian chờ ban đầu vì quá trình tạo Schema và Sample Data rất nặng
+        sleep 100
         
         for i in {1..30}; do
-          # Kiểm tra xem trang web đã thoát khỏi màn hình Install chưa bằng cách tìm nút Đăng ký
-          RESPONSE=$(curl -sL http://localhost:80)
+          # Kiểm tra status code. Nếu là 200 OK nghĩa là đã vượt qua trang Install (302)
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:80)
           
-          if echo "$RESPONSE" | grep -q "ico-register"; then
-            echo "SUCCESS: Homepage is LIVE and bypass Install page!"
-            exit 0
+          if [ "$STATUS" == "200" ]; then
+            # Kiểm tra thêm nội dung để chắc chắn không phải trang lỗi
+            if curl -s http://localhost:80 | grep -q "ico-register"; then
+              echo "SUCCESS: nopCommerce is LIVE and ready for Playwright!"
+              exit 0
+            fi
           fi
           
-          if echo "$RESPONSE" | grep -q "installation"; then
-            echo "Attempt $i: Still stuck on Install page. Checking logs..."
-            docker logs nop_app --tail 10
-          else
-            echo "Attempt $i: Page is loading or migrating..."
+          echo "Attempt $i: Status $STATUS. App is still installing database..."
+          # Nếu status là 000, nghĩa là container đã sập, in log ngay
+          if [ "$STATUS" == "000" ]; then
+            docker logs nop_app --tail 20
           fi
           sleep 15
         done
         
-        echo "FAILED: Final UI check failed. Container Logs:"
+        echo "FAILED: Final Logs before exit:"
         docker logs nop_app
         exit 1
 
