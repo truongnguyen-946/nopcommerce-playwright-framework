@@ -152,10 +152,12 @@ test.describe('User Registration Tests - with email existing in the system', () 
         confirmPassword: testData.defaultPassword
     };
 
-    test.beforeEach(async ({ registerPage }) => {
+    test.beforeEach(async ({ registerPage, menuHeader }) => {
         // Pre-register a user to ensure the email exists in the system
         await registerPage.fillForm(registerData);
         await registerPage.clickOnRegisterButton();
+        await menuHeader.clickLogout();
+        await menuHeader.openRegisterPage();
     });
 
     test('TC_003: Unsuccessful registration with email existing in the system shows error message', async ({ registerPage }) => {
