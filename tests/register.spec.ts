@@ -24,7 +24,7 @@ test.describe('User Registration Tests', () => {
             description: 'Unsuccessful registration with empty data shows error messages'
         });
 
-        await test.step('Navigate to the registration page', async () => {
+        await test.step('Click on the register button without filling any data', async () => {
             await registerPage.clickOnRegisterButton();
         });
 
