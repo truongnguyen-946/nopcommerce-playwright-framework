@@ -56,20 +56,32 @@ test.describe('User Login Tests with invalid data', () => {
 });
 
 test.describe('Login tests with registered user', () => {
-    const registerData = {
-        firstName: faker.person.firstName(),
-        lastName: faker.person.lastName(),
-        email: faker.internet.email(),
-        company: testData.companyName,
-        password: testData.defaultPassword,
-        confirmPassword: testData.defaultPassword
+    let registerData: {
+        firstName: string;
+        lastName: string;
+        email: string;
+        company: string;
+        password: string;
+        confirmPassword: string;
     };
 
-    test.beforeAll(async ({ registerPage, menuHeader }) => {
+    test.beforeEach(async ({ registerPage, menuHeader, page }) => {
+        // Generate new user data for each test
+        registerData = {
+            firstName: faker.person.firstName(),
+            lastName: faker.person.lastName(),
+            email: faker.internet.email(),
+            company: testData.companyName,
+            password: testData.defaultPassword,
+            confirmPassword: testData.defaultPassword
+        };
+        
         await registerPage.fillForm(registerData);
         await registerPage.clickOnRegisterButton();
         // Logout after registration to test login scenarios
         await menuHeader.clickLogout();
+        // Navigate to login page
+        await menuHeader.openLoginPage();
     });
 
     test('TC_004: Unsuccesful login with incorrect password shows error message', async ({ loginPage }) => {

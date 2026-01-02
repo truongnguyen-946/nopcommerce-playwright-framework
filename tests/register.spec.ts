@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { faker } from '@faker-js/faker';
 import * as testData from '../test-data/register-data.json';
 
-test.describe('User Registration Tests', () => {
+test.describe('User Registration Tests - with invalid data', () => {
 
 
     //Create data for registration
@@ -15,15 +15,6 @@ test.describe('User Registration Tests', () => {
         password: testData.defaultPassword,
         confirmPassword: testData.defaultPassword
     };
-
-    test.beforeAll(async ({ registerPage, menuHeader }) => {
-        await registerPage.fillForm(registrationData);
-        await registerPage.clickOnRegisterButton();
-        // Logout after registration to test login scenarios
-        await menuHeader.clickLogout();
-    });
-
-
 
     test('TC_001: Unsuccessful registration with empty data shows error messages', async ({ registerPage }) => {
         test.info().annotations.push({
@@ -73,34 +64,6 @@ test.describe('User Registration Tests', () => {
 
         await test.step('Verify error message is displayed for invalid email format', async () => {
             expect(emailError).toBe('Please enter a valid email address.');
-        });
-    });
-
-    test('TC_003: Unsuccessful registration with email existing in the system shows error message', async ({ registerPage }) => {
-        test.info().annotations.push({
-            type: 'description',
-            description: 'Unsuccessful registration with email existing in the system shows error message'
-        });
-
-        await test.step('Fill the registration form with an existing email', async () => {
-            await registerPage.fillForm({
-                firstName: registrationData.firstName,
-                lastName: registrationData.lastName,
-                email: registrationData.email, // Existing email
-                company: testData.companyName,
-                password: testData.defaultPassword,
-                confirmPassword: testData.defaultPassword
-            });
-        });
-
-        await test.step('Submit the registration form', async () => {
-            await registerPage.clickOnRegisterButton();
-        });
-
-        const emailError = await registerPage.getEmailAlreadyExistsErrorMessage();
-
-        await test.step('Verify error message is displayed for existing email', async () => {
-            expect(emailError).toBe('The specified email already exists');
         });
     });
 
@@ -178,3 +141,49 @@ test.describe('User Registration Tests', () => {
     });
 
 });
+test.describe('User Registration Tests - with email existing in the system', () => {
+
+    const registerData = {
+        firstName: faker.person.firstName(),
+        lastName: faker.person.lastName(),
+        email: faker.internet.email(),  // Unique email for pre-registration
+        company: testData.companyName,
+        password: testData.defaultPassword,
+        confirmPassword: testData.defaultPassword
+    };
+
+    test.beforeEach(async ({ registerPage }) => {
+        // Pre-register a user to ensure the email exists in the system
+        await registerPage.fillForm(registerData);
+        await registerPage.clickOnRegisterButton();
+    });
+
+    test('TC_003: Unsuccessful registration with email existing in the system shows error message', async ({ registerPage }) => {
+        test.info().annotations.push({
+            type: 'description',
+            description: 'Unsuccessful registration with email existing in the system shows error message'
+        });
+
+        await test.step('Fill the registration form with an existing email', async () => {
+            await registerPage.fillForm({
+                firstName: registerData.firstName,
+                lastName: registerData.lastName,
+                email: registerData.email, // Existing email
+                company: testData.companyName,
+                password: testData.defaultPassword,
+                confirmPassword: testData.defaultPassword
+            });
+        });
+
+        await test.step('Submit the registration form', async () => {
+            await registerPage.clickOnRegisterButton();
+        });
+
+        const emailError = await registerPage.getEmailAlreadyExistsErrorMessage();
+
+        await test.step('Verify error message is displayed for existing email', async () => {
+            expect(emailError).toBe('The specified email already exists');
+        });
+    });
+
+});  
