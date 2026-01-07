@@ -1,7 +1,5 @@
-import { test as base, test } from "../../fixtures/fixtures";
-import { MyAccountSideBarPage } from "../../pages/MyAccount/MyAccountSideBarPage";
-import { AddressPage } from "../../pages/MyAccount/AddressPage";
-import { fa, faker } from "@faker-js/faker";
+import { test } from "../../fixtures/fixtures";
+import { faker } from "@faker-js/faker";
 import { expect } from "@playwright/test";
 
 test.describe("My Account - Address", () => {
@@ -20,11 +18,17 @@ test.describe("My Account - Address", () => {
         faxNumber: faker.phone.number(),
     };
 
-    test("TC_001: Verify the error messages when mandatory fields are empty in Add New Address form", async ({ myAccountSideBarPage, addressPage }) => {
+    test.beforeEach(async ({ menuHeader, myAccountSideBarPage }) => {
+        await menuHeader.openMyAccountPage();
+        await myAccountSideBarPage.clickOnAddressesLink();
+    });
+
+    test("TC_001: Verify the error messages when mandatory fields are empty in Add New Address form", async ({ addressPage }) => {
         test.info().annotations.push({
             type: "description",
             description: "Verify the error messages when mandatory fields are empty in Add New Address form"
         });
+
         await test.step("Open Add New Address form", async () => {
             await addressPage.clickOnAddNewButton();
         });
@@ -52,7 +56,7 @@ test.describe("My Account - Address", () => {
         });
     });
 
-    test('TC_002: Verify the error message when State/Province is not selected in Add New Address form', async ({ myAccountSideBarPage, addressPage }) => {
+    test('TC_002: Verify the error message when State/Province is not selected in Add New Address form', async ({ addressPage }) => {
         test.info().annotations.push({
             type: 'description',
             description: 'Verify the error message when State/Province is not selected in Add New Address form'
@@ -87,7 +91,7 @@ test.describe("My Account - Address", () => {
         });
     });
 
-    test('TC_003: Verify the error message when invalid email format is entered in Add New Address form', async ({ myAccountSideBarPage, addressPage }) => {
+    test('TC_003: Verify the error message when invalid email format is entered in Add New Address form', async ({ addressPage }) => {
         test.info().annotations.push({
             type: 'description',
             description: 'Verify the error message when invalid email format is entered in Add New Address form'
@@ -122,7 +126,7 @@ test.describe("My Account - Address", () => {
         });
     });
 
-    test('TC_004: Verify that a new address is added successfully with valid data in Add New Address form', async ({ myAccountSideBarPage, addressPage }) => {
+    test('TC_004: Verify that a new address is added successfully with valid data in Add New Address form', async ({ addressPage }) => {
         test.info().annotations.push({
             type: 'description',
             description: 'Verify that a new address is added successfully with valid data in Add New Address form'

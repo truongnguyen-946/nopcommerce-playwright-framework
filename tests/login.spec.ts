@@ -2,15 +2,19 @@ import { test } from "../fixtures/fixtures";
 import { expect } from "@playwright/test";
 import { faker } from "@faker-js/faker";
 import * as testData from "../test-data/register-data.json";
-import { before } from "node:test";
+import { BASE_URL } from "../constants/urls";
 
 test.describe('User Login Tests with invalid data', () => {
-
-
+    //Create data for login
     const loginData = {
         email: faker.internet.email(),
         password: testData.defaultPassword
     };
+
+    test.beforeEach(async ({ page, menuHeader }) => {
+        await page.goto(BASE_URL);
+        await menuHeader.openLoginPage();
+    });
 
     test('TC_001: Unsuccessful login with empty data shows error messages', async ({ loginPage }) => {
         test.info().annotations.push({
@@ -75,7 +79,8 @@ test.describe('Login tests with registered user', () => {
             password: testData.defaultPassword,
             confirmPassword: testData.defaultPassword
         };
-
+        await page.goto(BASE_URL);
+        await menuHeader.openRegisterPage();
         await registerPage.fillForm(registerData);
         await registerPage.clickOnRegisterButton();
         // Logout after registration to test login scenarios

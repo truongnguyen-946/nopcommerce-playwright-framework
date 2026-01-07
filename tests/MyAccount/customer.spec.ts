@@ -1,10 +1,4 @@
-import { test as base, test } from "../../fixtures/fixtures";
-import { RegisterPage } from "../../pages/RegisterPage";
-import { LoginPage } from "../../pages/LoginPage";
-import { MenuHeader } from "../../pages/MenuHeader";
-import { HomePage } from "../../pages/HomePage";
-import { MyAccountSideBarPage } from "../../pages/MyAccount/MyAccountSideBarPage";
-import { CustomerPage } from "../../pages/MyAccount/CustomerPage";
+import { test } from "../../fixtures/fixtures";
 import { faker } from "@faker-js/faker";
 
 test.describe("My Account - Customer Info", () => {
@@ -17,13 +11,21 @@ test.describe("My Account - Customer Info", () => {
         gender: "male" as "male" | "female"
     }
 
-    test("TC_001: Verify that Customer Info is updated with correct user information", async ({ myAccountSideBarPage, customerPage }) => {
+    test("TC_001: Verify that Customer Info is updated with correct user information", async ({ myAccountSideBarPage, customerPage, menuHeader }) => {
         test.info().annotations.push({
             type: "description",
             description: "Verify that Customer Info page displays correct user information"
         });
 
-        await test.step("Update customer info with valid data", async () => {
+        await test.step("Navigate to My Account page", async () => {
+            await menuHeader.openMyAccountPage();
+        });
+
+        await test.step("Navigate to Customer Info page", async () => {
+            await myAccountSideBarPage.clickOnCustomerInfoLink();
+        });
+
+        await test.step("Update Customer Info with new data", async () => {
             await customerPage.updateCustomerInfo(
                 customerInfo.firstName,
                 customerInfo.lastName,
@@ -33,10 +35,10 @@ test.describe("My Account - Customer Info", () => {
             );
         });
 
-        await test.step("Verify success message is displayed after saving customer info", async () => {
-            const successMessage = await customerPage.successMessage.textContent();
-            test.expect(successMessage).toContain("The customer info has been updated successfully.");
 
+        await test.step("Verify success message is displayed after saving customer info", async () => {
+            await test.expect(customerPage.successMessage).toContainText("The customer info has been updated successfully.");
+            await menuHeader.closeNotificationBar();
         });
 
         await test.step("Verify that the updated customer info is displayed correctly", async () => {

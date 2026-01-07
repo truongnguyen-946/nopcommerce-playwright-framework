@@ -1,7 +1,5 @@
 import { test } from "../../fixtures/fixtures";
-import { ChangePasswordPage } from "../../pages/MyAccount/ChangePasswordPage";
-import { faker } from "@faker-js/faker";
-import { expect, Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 import * as testData from "../../test-data/register-data.json";
 
 test.describe("My Account - Change Password", () => {
@@ -11,7 +9,13 @@ test.describe("My Account - Change Password", () => {
         confirmPassword: testData.newPassword
     };
 
-    test("TC_001: Verify the error message when empty data is submitted in Change Password form", async ({ myAccountSideBarPage, changePasswordPage }) => {
+    test.beforeEach(async ({ menuHeader, myAccountSideBarPage }) => {
+        await menuHeader.openMyAccountPage();
+        await myAccountSideBarPage.clickOnChangePasswordLink();
+    });
+
+
+    test("TC_001: Verify the error message when empty data is submitted in Change Password form", async ({ changePasswordPage }) => {
         test.info().annotations.push({
             type: "description",
             description: "Verify the error message when empty data is submitted in Change Password form"
@@ -30,7 +34,7 @@ test.describe("My Account - Change Password", () => {
         });
     });
 
-    test("TC_002: Verify the error message when old password is incorrect in Change Password form", async ({ myAccountSideBarPage, changePasswordPage }) => {
+    test("TC_002: Verify the error message when old password is incorrect in Change Password form", async ({ changePasswordPage }) => {
         test.info().annotations.push({
             type: "description",
             description: "Verify the error message when old password is incorrect in Change Password form"
@@ -49,7 +53,7 @@ test.describe("My Account - Change Password", () => {
         });
     });
 
-    test("TC_004: Verify the error message when new password less than 6 characters is submitted in Change Password form", async ({ myAccountSideBarPage, changePasswordPage }) => {
+    test("TC_004: Verify the error message when new password less than 6 characters is submitted in Change Password form", async ({ changePasswordPage }) => {
         test.info().annotations.push({
             type: "description",
             description: "Verify the error message when new password less than 6 characters is submitted in Change Password form"
@@ -68,7 +72,7 @@ test.describe("My Account - Change Password", () => {
         });
     });
 
-    test("TC_005: Verify the error message when new password and confirm password do not match in Change Password form", async ({ myAccountSideBarPage, changePasswordPage }) => {
+    test("TC_005: Verify the error message when new password and confirm password do not match in Change Password form", async ({ changePasswordPage }) => {
         test.info().annotations.push({
             type: "description",
             description: "Verify the error message when new password and confirm password do not match in Change Password form"
@@ -88,7 +92,7 @@ test.describe("My Account - Change Password", () => {
         });
     });
 
-    test("TC_006: Verify that the password is changed successfully with valid data in Change Password form", async ({ menuHeader, loginPage, changePasswordPage }) => {
+    test("TC_006: Verify that the password is changed successfully with valid data in Change Password form", async ({ authenticatedUser, menuHeader, loginPage, changePasswordPage }) => {
         test.info().annotations.push({
             type: "description",
             description: "Verify that the password is changed successfully with valid data in Change Password form"
@@ -104,6 +108,17 @@ test.describe("My Account - Change Password", () => {
         await test.step("Verify success message is displayed after changing password", async () => {
             const successMessage = await changePasswordPage.getChangePasswordSuccessMessage();
             expect(successMessage).toContain("Password was changed");
+        });
+
+        await test.step("Close the notification bar", async () => {
+            await menuHeader.closeNotificationBar();
+        });
+
+        await test.step("Verify that user can login with the new password", async () => {
+            await menuHeader.clickLogout();
+            await menuHeader.openLoginPage();
+            await loginPage.login(authenticatedUser.email, newPasswordData.newPassword);
+            expect(await menuHeader.isMyAccountLinkVisible()).toBeTruthy();
         });
     });
 });
