@@ -2,10 +2,9 @@ import { test } from '../fixtures/fixtures';
 import { expect } from '@playwright/test';
 import { faker } from '@faker-js/faker';
 import * as testData from '../test-data/register-data.json';
+import { BASE_URL } from '../constants/urls';
 
 test.describe('User Registration Tests - with invalid data', () => {
-
-
     //Create data for registration
     const registrationData = {
         firstName: faker.person.firstName(),
@@ -15,6 +14,11 @@ test.describe('User Registration Tests - with invalid data', () => {
         password: testData.defaultPassword,
         confirmPassword: testData.defaultPassword
     };
+
+    test.beforeEach(async ({ page, menuHeader }) => {
+        await page.goto(BASE_URL);
+        await menuHeader.openRegisterPage();
+    });
 
     test('TC_001: Unsuccessful registration with empty data shows error messages', async ({ registerPage }) => {
         test.info().annotations.push({
@@ -67,7 +71,7 @@ test.describe('User Registration Tests - with invalid data', () => {
         });
     });
 
-    test('TC_004: Unsuccessful registration with password less than 6 characters shows error message', async ({ registerPage }) => {
+    test('TC_003: Unsuccessful registration with password less than 6 characters shows error message', async ({ registerPage }) => {
         test.info().annotations.push({
             type: 'description',
             description: 'Unsuccessful registration with password less than 6 characters shows error message'
@@ -95,7 +99,7 @@ test.describe('User Registration Tests - with invalid data', () => {
         });
     });
 
-    test('TC_005: Unsuccessful registration with mismatched password and confirmation shows error message', async ({ registerPage }) => {
+    test('TC_004: Unsuccessful registration with mismatched password and confirmation shows error message', async ({ registerPage }) => {
         test.info().annotations.push({
             type: 'description',
             description: 'Unsuccessful registration with mismatched password and confirmation shows error message'
@@ -121,7 +125,7 @@ test.describe('User Registration Tests - with invalid data', () => {
         });
     });
 
-    test('TC_006: Successful registration with valid data shows success message', async ({ registerPage }) => {
+    test('TC_005: Successful registration with valid data shows success message', async ({ registerPage }) => {
         test.info().annotations.push({
             type: 'description',
             description: 'Successful registration with valid data shows success message'
@@ -139,7 +143,6 @@ test.describe('User Registration Tests - with invalid data', () => {
             expect(registrationResult).toContain('Your registration completed');
         });
     });
-
 });
 test.describe('User Registration Tests - with email existing in the system', () => {
 
@@ -152,7 +155,9 @@ test.describe('User Registration Tests - with email existing in the system', () 
         confirmPassword: testData.defaultPassword
     };
 
-    test.beforeEach(async ({ registerPage, menuHeader }) => {
+    test.beforeEach(async ({ page, registerPage, menuHeader }) => {
+        await page.goto(BASE_URL);
+        await menuHeader.openRegisterPage();
         // Pre-register a user to ensure the email exists in the system
         await registerPage.fillForm(registerData);
         await registerPage.clickOnRegisterButton();
@@ -160,7 +165,7 @@ test.describe('User Registration Tests - with email existing in the system', () 
         await menuHeader.openRegisterPage();
     });
 
-    test('TC_003: Unsuccessful registration with email existing in the system shows error message', async ({ registerPage }) => {
+    test('TC_006: Unsuccessful registration with email existing in the system shows error message', async ({ registerPage }) => {
         test.info().annotations.push({
             type: 'description',
             description: 'Unsuccessful registration with email existing in the system shows error message'
@@ -187,5 +192,4 @@ test.describe('User Registration Tests - with email existing in the system', () 
             expect(emailError).toBe('The specified email already exists');
         });
     });
-
 });  

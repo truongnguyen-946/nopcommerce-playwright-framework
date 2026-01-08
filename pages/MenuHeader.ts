@@ -35,7 +35,42 @@ export class MenuHeader {
         return this.page.locator(".ico-logout");
     }
 
+    get closeIconInNotificationBar(): Locator {
+        return this.page.locator("#bar-notification .close");
+    }
 
+    get computersLink() {
+        return this.page.locator(".header-menu a[href='/computers']");
+    }
+
+    get electronicsLink() {
+        return this.page.locator(".header-menu a[href='/electronics']");
+    }
+
+    get apparelLink() {
+        return this.page.locator(".header-menu a[href='/apparel']");
+    }
+
+    get digitalDownloadsLink() {
+        return this.page.locator(".header-menu a[href='/digital-downloads']");
+    }
+
+    get booksLink() {
+        return this.page.locator(".header-menu a[href='/books']");
+    }
+
+    get jewelryLink() {
+        return this.page.locator(".header-menu a[href='/jewelry']");
+    }
+
+    get giftCardsLink() {
+        return this.page.locator(".header-menu a[href='/gift-cards']");
+    }
+
+    async openComputersPage(): Promise<void> {
+        await this.computersLink.waitFor({ state: "visible" });
+        await this.computersLink.click();
+    }
 
     /**
      * Navigates to the registration page by clicking the register link.
@@ -82,5 +117,15 @@ export class MenuHeader {
 
     async isMyAccountLinkVisible(): Promise<boolean> {
         return this.myAccountLink.isVisible();
+    }
+
+    async openMyAccountPage(): Promise<void> {
+        await this.myAccountLink.waitFor({ state: "visible" });
+        await this.myAccountLink.click();
+    }
+
+    async closeNotificationBar(): Promise<void> {
+        await this.closeIconInNotificationBar.waitFor({ state: "visible" });
+        await this.closeIconInNotificationBar.click();
     }
 }
