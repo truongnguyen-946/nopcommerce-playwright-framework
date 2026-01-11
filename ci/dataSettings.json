@@ -1,0 +1,7 @@
+{
+  "DataConfig": {
+    "DataProvider": "sqlserver",
+    "ConnectionString": "Server=localhost;Database=nopCommerce;User ID=sa;Password=Can@922946;TrustServerCertificate=True",
+    "Dbms": "sqlserver"
+  }
+}

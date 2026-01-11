@@ -75,6 +75,10 @@ export class RegisterPage {
         return this.page.locator(".center-1 .result");
     }
 
+    get emailAlreadyExistsErrorMessage() {
+        return this.page.locator(".message-error li");
+    }
+
     /**
      * Selects the gender radio button based on the provided value.
      * @param gender - The gender to select, either "male" or "female"
@@ -171,4 +175,13 @@ export class RegisterPage {
     async getRegistrationResultMessage(): Promise<string | null> {
         return this.registrationResultMessage.textContent();
     }
+
+    /**
+     * Retrieves the error message displayed when the email already exists in the system.
+     * @returns The error message text, or null if no error is displayed
+     */
+    async getEmailAlreadyExistsErrorMessage(): Promise<string | null> {
+        return this.emailAlreadyExistsErrorMessage.textContent();
+    }
+
 }
